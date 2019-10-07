@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Pycharm
 .idea/
 
 # C extensions
