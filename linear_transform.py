@@ -180,6 +180,11 @@ class ComplexCircle(_Line, _Circle):
 
 class Region:
 
+    def __init__(self, check_func:callable,
+                 bound_real=(-10, 10), bound_imag=(-10, 10)):
+
+        pass
+
     def show(self, fig, color='b'):
         pass
 
@@ -211,7 +216,14 @@ class FracLinearTransform(Transformation):
         self._d = d
 
     def calc(self, point: complex):
-        return (self._a * point + self._b) / (self._c * point + self._d)
+        if is_inf(point):
+            return complex(float('inf'), float('inf')) if self._c == 0 else \
+                self._a / self._c
+        try:
+            res = (self._a * point + self._b) / (self._c * point + self._d)
+        except ZeroDivisionError:
+            res = complex(float('inf'), float('inf'))
+        return res
 
     def transform(self, region: Region):
         pass
@@ -225,26 +237,14 @@ class FracLinearTransform(Transformation):
     def _transform_circle(self, necc_points) -> ComplexCircle:
         res_points = []
         for point in necc_points:
-            try:
-                tmp = self.calc(point)
-            except ZeroDivisionError:
-                tmp = complex(float('inf'), float('inf'))
-            res_points.append(tmp)
+            res_points.append(self.calc(point))
         return ComplexCircle(*res_points)
 
     def _transform_line(self, line: _Line) -> ComplexCircle:
         res_points = []
-        for point in [line._a, line._b]:
-            try:
-                tmp = self.calc(point)
-            except ZeroDivisionError:
-                tmp = complex(float('inf'), float('inf'))
-            res_points.append(tmp)
-        if self._c == 0:
-            return ComplexCircle(*res_points,
-                                 complex(float('inf'), float('inf')))
-        else:
-            return ComplexCircle(*res_points, self._a / self._c)
+        for point in [line._a, line._b, float('inf')]:
+            res_points.append(self.calc(point))
+        return ComplexCircle(*res_points)
 
 
 def test_1():
@@ -307,5 +307,5 @@ def test_3():
 
 
 if __name__ == "__main__":
-
+    test_2()
     test_3()
