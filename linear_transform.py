@@ -174,9 +174,14 @@ class ComplexCircle(_Line, _Circle):
         radius = abs(a - center)
         return center, radius
 
+    def type(self):
+        return self._type
+
 
 class Region:
-    pass
+
+    def show(self, fig, color='b'):
+        pass
 
 
 class Transformation(metaclass=ABCMeta):
@@ -196,10 +201,50 @@ class FracLinearTransform(Transformation):
         ----------
         a, b, c, d - complex numbers - parameters of transformation.
         """
+        self._a = a
+        self._b = b
+        self._c = c
+        self._d = d
+
+    def _calc(self, point: complex):
+        return (self._a * point + self._b) / (self._c * point + self._d)
+
+    def transform(self, region: Region):
         pass
 
+    def tcc(self, circle: ComplexCircle) -> ComplexCircle:
+        if circle.type() == ComplexCircle.CIRCLE:
+            return self._transform_circle(circle._points)
+        else:
+            return self._transform_line(circle)
 
-if __name__ == "__main__":
+    def _transform_circle(self, necc_points) -> ComplexCircle:
+        res_points = []
+        for point in necc_points:
+            try:
+                tmp = self._calc(point)
+            except ZeroDivisionError:
+                tmp = complex(float('inf'), float('inf'))
+            res_points.append(tmp)
+        return ComplexCircle(*res_points)
+
+    def _transform_line(self, line: _Line) -> ComplexCircle:
+        res_points = []
+        for point in [line._a, line._b]:
+            try:
+                tmp = self._calc(point)
+            except ZeroDivisionError:
+                tmp = complex(float('inf'), float('inf'))
+            res_points.append(tmp)
+        if self._c == 0:
+            return ComplexCircle(*res_points,
+                                 complex(float('inf'), float('inf')))
+        else:
+            return ComplexCircle(*res_points, self._a / self._c)
+
+
+def test_1():
+
     test = _Circle(complex(2, 0), 5)
     test.show(label='test1, just circle')
     plt.legend()
@@ -220,3 +265,42 @@ if __name__ == "__main__":
     test5.show(label='test5, complex circle with infinity', color='g')
     plt.legend()
     plt.show()
+
+def test2():
+    test_transform = FracLinearTransform(2, 0, 1, -2)
+    circle1 = ComplexCircle(complex(2, 0), complex(-2, 0), complex(0, 2))
+    circle2 = ComplexCircle(complex(0, 0), complex(2, 0), complex(1, 1))
+
+    circle1.show(color='r', label='Circle 1')
+    circle2.show(color='g', label='Circle 2')
+    plt.legend()
+    plt.show()
+
+    res_circle1 = test_transform.tcc(circle1)
+    res_circle2 = test_transform.tcc(circle2)
+    res_circle1.show(color='r', label='Image of circle 1')
+    res_circle2.show(color='g', label='Image of circle 2')
+    plt.legend()
+    plt.show()
+
+
+def test3():
+    test_line = ComplexCircle(0, complex(0, 1), complex(float('inf'), 0))
+    test_circle = ComplexCircle(1, -1, complex(0, 1))
+    test_line.show(label='test line', color='r')
+    test_circle.show(label='test circle', color='g')
+    plt.legend()
+    plt.show()
+
+    test_transform = FracLinearTransform(1, -1, 1, 1)
+    res_test_line = test_transform.tcc(test_line)
+    res_test_circle = test_transform.tcc(test_circle)
+    res_test_circle.show(label='test circle', color='g')
+    res_test_line.show(label='test line', color='r')
+    plt.legend()
+    plt.show()
+
+
+if __name__ == "__main__":
+
+    test3()
