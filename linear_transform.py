@@ -24,7 +24,7 @@ def show_complex_point(z, fig, color):
 class Figure(metaclass=ABCMeta):
 
     @abstractmethod
-    def show(self, bound_ext=10, step=1e-3, fig=None, **plt_kwargs):
+    def show(self, bound_ext=10., step=1e-3, fig=None, **plt_kwargs):
         pass
 
 
@@ -35,8 +35,9 @@ class _Circle(Figure):
         self._c = center
         self._r = radius
 
-    def show(self, step=1e-3, fig=None, **plt_kwargs):
-        show_complex_point(self._c, fig, plt_kwargs.get('color', 'b'))
+    def show(self, *, show_points=True, step=1e-3, fig=None, **plt_kwargs):
+        if show_points:
+            show_complex_point(self._c, fig, plt_kwargs.get('color', 'b'))
         angles = np.arange(0, 2 * np.pi, step)
         x = self._c.real + self._r * np.cos(angles)
         y = self._c.imag + self._r * np.sin(angles)
@@ -57,18 +58,20 @@ class _Line:
         self._a = a
         self._b = b
 
-    def show(self, bound_ext=10, step=1e-3, fig=None, **plt_kwargs):
-        show_complex_point(self._a, fig, plt_kwargs.get('color', 'b'))
-        show_complex_point(self._b, fig, plt_kwargs.get('color', 'b'))
+    def show(self, *, show_points=True, bound_ext=10., step=1e-3,
+             fig=None, **plt_kwargs):
+        if show_points:
+            show_complex_point(self._a, fig, plt_kwargs.get('color', 'b'))
+            show_complex_point(self._b, fig, plt_kwargs.get('color', 'b'))
 
         x1, x2 = self._a.real, self._b.real
         y1, y2 = self._a.imag, self._b.imag
 
         if x2 - x1:
-            x = np.arange(x1 - bound_ext, x2 + bound_ext, step)
+            x = np.arange(x1 - bound_ext/2, x2 + bound_ext/2, step)
             y = (x - x1) * (y2 - y1) / (x2 - x1) + y1
         else:
-            y = np.arange(y1 - bound_ext, y2 + bound_ext, step)
+            y = np.arange(y1 - bound_ext/2, y2 + bound_ext/2, step)
             x = (y - y1) * (x2 - x1) / (y2 - y1) + x1
 
         if fig:
@@ -104,13 +107,17 @@ class ComplexCircle(_Line, _Circle):
             self._points = [a, b, c]
             _Circle.__init__(self, tmp_center, tmp_radius)
 
-    def show(self, bound_ext=10, step=1e-3, fig=None, **plt_kwargs):
+    def show(self, *, show_points=True, bound_ext=10., step=1e-3, fig=None, **plt_kwargs):
         if self._type == ComplexCircle.CIRCLE:
-            for point in self._points:
-                show_complex_point(point, fig, plt_kwargs.get('color', 'b'))
-            return _Circle.show(self, step, fig, **plt_kwargs)
+            if show_points:
+                for point in self._points:
+                    show_complex_point(point, fig, plt_kwargs.get('color', 'b'))
+            return _Circle.show(self, show_points=show_points,
+                                step=step, fig=fig, **plt_kwargs)
         else:
-            return _Line.show(self, bound_ext, step, fig, **plt_kwargs)
+            return _Line.show(self, show_points=show_points,
+                              bound_ext=bound_ext, step=step,
+                              fig=fig, **plt_kwargs)
 
     @staticmethod
     def _is_points_on_line(a: complex, b: complex, c: complex, eps=1e-8):
@@ -180,13 +187,42 @@ class ComplexCircle(_Line, _Circle):
 
 class Region:
 
-    def __init__(self, check_func:callable,
-                 bound_real=(-10, 10), bound_imag=(-10, 10)):
+    def __init__(self, points):
+        self._data = points
 
-        pass
+    def show(self, fig=None, show_lines=False, bound_ext=10., color='b'):
+        for point in self._data:
+            show_complex_point(point, fig, color=color)
+        if show_lines:
+            hor_lines, vert_lines = self.prepare_lines(bound_ext)
 
-    def show(self, fig, color='b'):
-        pass
+            for line in vert_lines + hor_lines:
+                line.show(fig=fig, show_points=False,
+                          bound_ext=bound_ext, color=color, linestyle='--')
+
+    def prepare_lines(self, bound_ext):
+        x_lines = {x.real for x in self._data}
+        y_lines = {x.imag for x in self._data}
+        vert_lines = [ComplexCircle(complex(x, self._data[0].imag),
+                                    complex(x, self._data[0].imag + bound_ext/2),
+                                    complex(x, self._data[0].imag - bound_ext/2))
+                      for x in x_lines]
+        hor_lines = [ComplexCircle(complex(self._data[0].real, y),
+                                   complex(self._data[0].real + bound_ext/2, y),
+                                   complex(self._data[0].real - bound_ext/2, y))
+                     for y in y_lines]
+        return hor_lines, vert_lines
+
+    def __iter__(self):
+        return iter(self._data)
+
+
+def region(check_func, bound_real=(-10, 10),
+           bound_imag=(-10, 10), step=0.2) -> Region:
+    x = np.arange(bound_real[0], bound_real[1], step)
+    y = np.arange(bound_imag[0], bound_imag[1], step)
+    points = [complex(_x, _y) for _x in x for _y in y if check_func(complex(_x, _y))]
+    return Region(points)
 
 
 class Transformation(metaclass=ABCMeta):
@@ -225,8 +261,11 @@ class FracLinearTransform(Transformation):
             res = complex(float('inf'), float('inf'))
         return res
 
-    def transform(self, region: Region):
-        pass
+    def transform(self, region: Region, bound_ext=10.):
+        hor_lines, vert_lies = region.prepare_lines(bound_ext)
+        res_circles = [self.tcc(x) for x in hor_lines + vert_lies]
+        res_points = [self.calc(point) for point in region]
+        return Region(res_points), res_circles
 
     def tcc(self, circle: ComplexCircle) -> ComplexCircle:
         if circle.type() == ComplexCircle.CIRCLE:
@@ -306,6 +345,26 @@ def test_3():
     plt.show()
 
 
+def test_4():
+    def test_func_check(z: complex):
+        return abs(z) < 2 and abs(z - 1) > 1
+
+    test_region = region(test_func_check, bound_real=(-3, 3),
+                         bound_imag=(-3, 3), step=0.2)
+
+    test_region.show(show_lines=True, bound_ext=5.)
+    plt.show()
+
+    test_transform = FracLinearTransform(2, 0, 1, -2)
+
+    plt.xlim(-5, 5)
+    plt.ylim(-5, 5)
+    res_region, circles = test_transform.transform(test_region, 5.)
+    res_region.show(color='g')
+    for el in circles:
+        el.show(show_points=False, linestyle='--', color='b')
+    plt.show()
+
+
 if __name__ == "__main__":
-    test_2()
-    test_3()
+    test_4()
