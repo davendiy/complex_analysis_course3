@@ -11,7 +11,24 @@ def is_inf(z: complex):
     return abs(z) == float('inf')
 
 
-class _Circle:
+def show_complex_point(z, fig, color):
+    if is_inf(z):
+        return
+
+    if fig:
+        fig.scatter([z.real], [z.imag], color=color)
+    else:
+        plt.scatter([z.real], [z.imag], color=color)
+
+
+class Figure(metaclass=ABCMeta):
+
+    @abstractmethod
+    def show(self, bound_ext=10, step=1e-3, fig=None, **plt_kwargs):
+        pass
+
+
+class _Circle(Figure):
 
     def __init__(self, center: complex, radius: float):
         assert radius, 'Radius of circle must be non-zero.'
@@ -19,6 +36,7 @@ class _Circle:
         self._r = radius
 
     def show(self, step=1e-3, fig=None, **plt_kwargs):
+        show_complex_point(self._c, fig, plt_kwargs.get('color', 'b'))
         angles = np.arange(0, 2 * np.pi, step)
         x = self._c.real + self._r * np.cos(angles)
         y = self._c.imag + self._r * np.sin(angles)
@@ -26,9 +44,6 @@ class _Circle:
             fig.plot(x, y, **plt_kwargs)
         else:
             plt.plot(x, y, **plt_kwargs)
-            if 'label' in plt_kwargs:
-                plt.legend()
-            plt.show()
 
 
 class _Line:
@@ -39,25 +54,27 @@ class _Line:
 
         assert not is_inf(a) and not is_inf(b), 'Infinity points for line.'
 
-        self._x1, self._x2 = a.real, b.real
-        self._y1, self._y2 = a.imag, b.imag
+        self._a = a
+        self._b = b
 
     def show(self, bound_ext=10, step=1e-3, fig=None, **plt_kwargs):
+        show_complex_point(self._a, fig, plt_kwargs.get('color', 'b'))
+        show_complex_point(self._b, fig, plt_kwargs.get('color', 'b'))
 
-        if self._x2 - self._x1:
-            x = np.arange(self._x1 - bound_ext, self._x2 + bound_ext, step)
-            y = (x - self._x1) * (self._y2 - self._y1) / (self._x2 - self._x1)
+        x1, x2 = self._a.real, self._b.real
+        y1, y2 = self._a.imag, self._b.imag
+
+        if x2 - x1:
+            x = np.arange(x1 - bound_ext, x2 + bound_ext, step)
+            y = (x - x1) * (y2 - y1) / (x2 - x1) + y1
         else:
-            y = np.arange(self._y1 - bound_ext, self._y2 + bound_ext, step)
-            x = (y - self._y1) * (self._x2 - self._x1) / (self._y2 - self._y1)
+            y = np.arange(y1 - bound_ext, y2 + bound_ext, step)
+            x = (y - y1) * (x2 - x1) / (y2 - y1) + x1
 
         if fig:
             fig.plot(x, y, **plt_kwargs)
         else:
             plt.plot(x, y, **plt_kwargs)
-            if 'label' in plt_kwargs:
-                plt.legend()
-            plt.show()
 
 
 class ComplexCircle(_Line, _Circle):
@@ -84,10 +101,13 @@ class ComplexCircle(_Line, _Circle):
         else:
             tmp_center, tmp_radius = ComplexCircle._find_center_radius(a, b, c)
             self._type = ComplexCircle.CIRCLE
+            self._points = [a, b, c]
             _Circle.__init__(self, tmp_center, tmp_radius)
 
     def show(self, bound_ext=10, step=1e-3, fig=None, **plt_kwargs):
         if self._type == ComplexCircle.CIRCLE:
+            for point in self._points:
+                show_complex_point(point, fig, plt_kwargs.get('color', 'b'))
             return _Circle.show(self, step, fig, **plt_kwargs)
         else:
             return _Line.show(self, bound_ext, step, fig, **plt_kwargs)
@@ -143,7 +163,8 @@ class ComplexCircle(_Line, _Circle):
         y2 = (c.imag + a.imag) / 2
 
         # formula of x value of intersection of perpendicular bisectors
-        x = (n1 * n2 * (y2 - y1) + x2 * m2 * n1 - x1 * m1 * n2) / (n1 * m2 - n2 * m1)
+        x = (n1 * n2 * (y2 - y1) + x2 * m2 * n1 - x1 * m1 * n2) / \
+            (n1 * m2 - n2 * m1)
         if n2 != 0:  # one of our vectors must have non-zero y-component
             y = (m2 * (x - x2)) / (-n2) + y2  # formula of y value of intersection
         else:
@@ -181,15 +202,21 @@ class FracLinearTransform(Transformation):
 if __name__ == "__main__":
     test = _Circle(complex(2, 0), 5)
     test.show(label='test1, just circle')
+    plt.legend()
+    plt.show()
 
     test2 = _Line(complex(1, 0), complex(10, 0))
     test2.show(label='test2, just horizontal line')
+    plt.legend()
+    plt.show()
 
     test3 = _Line(complex(-2, 4), complex(-2, 10))
-    test3.show(label='test3, just vertical line')
+    test3.show(label='test3, just vertical line', color='b')
 
     test4 = ComplexCircle(complex(2, 3), complex(4, 5), complex(-5, 7))
-    test4.show(label='test4, complex circle - just circle')
+    test4.show(label='test4, complex circle - just circle', color='r')
 
     test5 = ComplexCircle(complex(2, 3), complex(4, 5), float('inf'))
-    test5.show(label='test5, complex circle with infinity')
+    test5.show(label='test5, complex circle with infinity', color='g')
+    plt.legend()
+    plt.show()
