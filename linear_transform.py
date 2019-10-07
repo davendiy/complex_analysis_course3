@@ -190,6 +190,10 @@ class Transformation(metaclass=ABCMeta):
     def transform(self, region: Region):
         pass
 
+    @abstractmethod
+    def calc(self, point: complex):
+        pass
+
 
 class FracLinearTransform(Transformation):
 
@@ -206,7 +210,7 @@ class FracLinearTransform(Transformation):
         self._c = c
         self._d = d
 
-    def _calc(self, point: complex):
+    def calc(self, point: complex):
         return (self._a * point + self._b) / (self._c * point + self._d)
 
     def transform(self, region: Region):
@@ -222,7 +226,7 @@ class FracLinearTransform(Transformation):
         res_points = []
         for point in necc_points:
             try:
-                tmp = self._calc(point)
+                tmp = self.calc(point)
             except ZeroDivisionError:
                 tmp = complex(float('inf'), float('inf'))
             res_points.append(tmp)
@@ -232,7 +236,7 @@ class FracLinearTransform(Transformation):
         res_points = []
         for point in [line._a, line._b]:
             try:
-                tmp = self._calc(point)
+                tmp = self.calc(point)
             except ZeroDivisionError:
                 tmp = complex(float('inf'), float('inf'))
             res_points.append(tmp)
@@ -266,7 +270,8 @@ def test_1():
     plt.legend()
     plt.show()
 
-def test2():
+
+def test_2():
     test_transform = FracLinearTransform(2, 0, 1, -2)
     circle1 = ComplexCircle(complex(2, 0), complex(-2, 0), complex(0, 2))
     circle2 = ComplexCircle(complex(0, 0), complex(2, 0), complex(1, 1))
@@ -284,7 +289,7 @@ def test2():
     plt.show()
 
 
-def test3():
+def test_3():
     test_line = ComplexCircle(0, complex(0, 1), complex(float('inf'), 0))
     test_circle = ComplexCircle(1, -1, complex(0, 1))
     test_line.show(label='test line', color='r')
@@ -303,4 +308,4 @@ def test3():
 
 if __name__ == "__main__":
 
-    test3()
+    test_3()
